@@ -36,7 +36,7 @@ fastsearch_SA <- function(StartPoint){
 ModelSelected <- function(modelmatrix){return(colSums(BurnSeq(modelmatrix,1000))/1000)}
 
 ###Parallel
-ncores <- 30
+ncores <- 50
 
 ###Data-------------------------------------------------------------------
 
