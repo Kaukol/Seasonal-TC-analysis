@@ -35,8 +35,6 @@ fastsearch_SA <- function(StartPoint){
 
 ModelSelected <- function(modelmatrix){return(colSums(BurnSeq(modelmatrix,1000))/1000)}
 
-###Parallel
-ncores <- 50
 
 ###Data-------------------------------------------------------------------
 
@@ -57,6 +55,11 @@ p <- dim(x.r)[2]
 Seq_length <- 5000
 #Cut_length <- 1000
 Loop <- 200
+
+###Parallel
+ncores <- 32
+cl <- makeCluster(ncores, type = "FORK")
+
 ###Linear Model -------------------------------------------------------------------------------------------
 
 InverseT <- 1
@@ -73,13 +76,9 @@ for(i in 1:Loop){
 }
 
 ###Searching
-cl <- makeCluster(ncores, type = "FORK")
 SelectedLModel <- parLapply(cl,StartPoint,fastsearch)
-stopCluster(cl)
 
-cl <- makeCluster(ncores, type = "FORK")
 SelectedLModel_SA <- parLapply(cl,StartPoint,fastsearch_SA)
-stopCluster(cl)
 
 ####Poisson regression-------------------------------------------
 ###Setting up start point
@@ -91,14 +90,9 @@ for(i in 1:Loop){
 }
 
 ###Searching
-cl <- makeCluster(ncores, type = "FORK")
 SelectedPModel <- parLapply(cl,StartPoint,fastsearch)
-stopCluster(cl)
 
-cl <- makeCluster(ncores, type = "FORK")
 SelectedPModel_SA <- parLapply(cl,StartPoint,fastsearch_SA)
-stopCluster(cl)
-
 
 ####Linear---------------------------------------------------
 InverseT <- 3
@@ -114,9 +108,7 @@ for(i in 1:Loop){
 }
 
 ###Searching
-cl <- makeCluster(ncores, type = "FORK")
 SelectedLModel.3 <- parLapply(cl,StartPoint,fastsearch)
-stopCluster(cl)
 
 ####Poisson regression-------------------------------------------
 ###Setting up start point
@@ -128,8 +120,9 @@ for(i in 1:Loop){
 }
 
 ###Searching
-cl <- makeCluster(ncores, type = "FORK")
 SelectedPModel.3 <- parLapply(cl,StartPoint,fastsearch)
+
+###END
 stopCluster(cl)
 
 LModelCompare <- t(sapply(SelectedLModel, ModelSelected))
