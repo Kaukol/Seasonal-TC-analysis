@@ -186,7 +186,7 @@ InfoCritForModel <- function(SelectedModel, info = c("AIC", "BIC", "AICc"), fami
 }
 
 #Gibbs sampler simualted annealing
-GibbsSampler_Search_SA <- function(Y, X, StartModel, Seq_Length, InverseT = c("Log", "Geo"), info = c("AIC", "BIC", "AICc"), family = c("gaussian","poisson", "binomial")){
+GibbsSampler_Search_SA <- function(Y, X, StartModel, Seq_Length, InverseT, info = c("AIC", "BIC", "AICc"), family = c("gaussian","poisson", "binomial")){
   
   #data
   y <- Y
@@ -194,7 +194,7 @@ GibbsSampler_Search_SA <- function(Y, X, StartModel, Seq_Length, InverseT = c("L
   z <- as.data.frame(cbind(y,x))
   
   #Start
-  #n <- InverseT
+  InverseT <- InverseT
   StartIndex <- StartModel
   StartModel <- c(1, StartIndex)
   ModelSeletionMatrix <- StartModel
@@ -202,7 +202,7 @@ GibbsSampler_Search_SA <- function(Y, X, StartModel, Seq_Length, InverseT = c("L
   #Loop
   j <- 0
   while(j < Seq_Length){
-    n <- log(j+1)/2
+    n <- log(j+1) * InverseT
     for(i in 1:(ncol(z) - 1)){
       TempIndex <- StartIndex
       
