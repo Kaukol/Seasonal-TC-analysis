@@ -98,8 +98,6 @@ SelectedPModel_SA <- parLapply(cl,StartPoint,fastsearch_SA)
 ####Linear---------------------------------------------------
 InverseT <- 3
 ###AR------------------------------------------------------------------
-y <- tc.ar
-z <- as.data.frame(cbind(y,x.r))
 ###Setting up start point
 i <- 1
 StartPoint <- list()
