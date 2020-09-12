@@ -170,21 +170,6 @@ BurnSeq <- function(ModelSeletionMatrix, Cut_Length){
   return(CutModelMatrix)
 }
 
-
-####Model selection by
-InfoCritForModel <- function(SelectedModel, info = c("AIC", "BIC", "AICc"), family = c("gaussian","poisson", "binomial")){
-  if(info == "AIC"){
-    return(AIC(glm(y~., data = z[,SelectedModel], family = family)))
-  }
-  else if(info == "BIC"){
-    return(BIC(glm(y~., data = z[,SelectedModel], family = family)))
-  }
-  else if(info == "AICc"){
-    return(AICc(glm(y~., data = z[,SelectedModel], family = family)))
-  }
-  else {return("Wrong criteria")}
-}
-
 #Gibbs sampler simualted annealing
 GibbsSampler_Search_SA <- function(Y, X, StartModel, Seq_Length, InverseT, info = c("AIC", "BIC", "AICc"), family = c("gaussian","poisson", "binomial")){
   
