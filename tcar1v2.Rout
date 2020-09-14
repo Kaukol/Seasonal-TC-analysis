@@ -1,0 +1,587 @@
+
+R version 3.5.1 (2018-07-02) -- "Feather Spray"
+Copyright (C) 2018 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+Microsoft R Open 3.5.1
+The enhanced R distribution from Microsoft
+Microsoft packages Copyright (C) 2018 Microsoft Corporation
+
+Using the Intel MKL for parallel mathematical computing (using 32 cores).
+
+Default CRAN mirror snapshot taken on 2018-08-01.
+See: https://mran.microsoft.com/.
+
+> ###Set seed------------------------------------
+> setwd("/mount/autofs/home_ad1/student.unimelb.edu.au/lizhongc/myGit/Seasonal-TC-data")
+> 
+> set.seed(1)
+> 
+> source("/mount/autofs/home_ad1/student.unimelb.edu.au/lizhongc/myGit/Seasonal-TC-analysis/gibbssearch.R")
+Loading required package: foreach
+Loading required package: iterators
+Loading required package: parallel
+> 
+> ###Search program---------------------------------------
+> 
+> fastsearch <- function(StartPoint){
++   
++   #Model setting
++   StartModel <- StartPoint$StartModelIndex
++   InverseT <- StartPoint$InverseT
++   Seq <- StartPoint$Seq
++   family <- StartPoint$family
++   info <- StartPoint$info
++   z <- StartPoint$database
++   
++   return(GibbsSampler_Search_MH(z[,1],z[,-1],StartModel,Seq, InverseT, info = info, family = family))
++ }
+> 
+> fastsearch_SA <- function(StartPoint){
++   
++   #Model setting
++   StartModel <- StartPoint$StartModelIndex
++   InverseT <- StartPoint$InverseT
++   Seq <- StartPoint$Seq
++   family <- StartPoint$family
++   info <- StartPoint$info
++   z <- StartPoint$database
++   
++   return(GibbsSampler_Search_SA(z[,1],z[,-1],StartModel,Seq, InverseT, info = info, family = family))
++ }
+> 
+> ModelSelected <- function(modelmatrix){return(colSums(BurnSeq(modelmatrix,1000))/1000)}
+> 
+> 
+> ###Data-------------------------------------------------------------------
+> 
+> ###Tropicial cyclone counts
+> tc.counts <- read.csv("countsrevised.csv")
+> ###covariates data in Aug Sep Oct
+> x1 <- read.csv("data_aug_1970.csv")
+> x2 <- read.csv("data_sep_1970.csv")
+> x3 <- read.csv("data_oct_1970.csv")
+> x.r <- cbind(x1[,3:14], x2[,3:14], x3[,3:14])
+> 
+> tc <- tc.counts$AR.1
+> 
+> n <- dim(x.r)[1]
+> p <- dim(x.r)[2]
+> 
+> ###Random start model -----------------------------------------------------
+> Seq_length <- 5000
+> #Cut_length <- 1000
+> Loop <- 200
+> ###Linear Model -------------------------------------------------------------------------------------------
+> 
+> ###Parallel
+> ncores <- 32
+> cl <- makeCluster(ncores, type = "FORK")
+> 
+> InverseT <- 1
+> ####Linear---------------------------------------------------
+> ###AR------------------------------------------------------------------
+> y <- tc
+> z <- as.data.frame(cbind(y,x.r))
+> ###Setting up start point
+> i <- 1
+> StartPoint <- list()
+> for(i in 1:Loop){
++   StartPoint <- c(StartPoint, list(list(database = z, StartModelIndex = rbinom(p,1,0.5), InverseT = InverseT , Seq = Seq_length, info = "AICc", family = "gaussian")))
++   i <- i+1
++ }
+> 
+> ###Searching
+> 
+> SelectedLModel <- parLapply(cl,StartPoint,fastsearch)
+> 
+> SelectedLModel_SA <- parLapply(cl,StartPoint,fastsearch_SA)
+> 
+> ####Poisson regression-------------------------------------------
+> ###Setting up start point
+> i <- 1
+> StartPoint <- list()
+> for(i in 1:Loop){
++   StartPoint <- c(StartPoint, list(list(database = z, StartModelIndex = rbinom(p,1,0.5), InverseT = InverseT , Seq = Seq_length, info = "AICc", family = "poisson")))
++   i <- i+1
++ }
+> 
+> ###Searching
+> SelectedPModel <- parLapply(cl,StartPoint,fastsearch)
+> 
+> SelectedPModel_SA <- parLapply(cl,StartPoint,fastsearch_SA)
+> 
+> ####Linear---------------------------------------------------
+> InverseT <- 3
+> ###AR------------------------------------------------------------------
+> ###Setting up start point
+> i <- 1
+> StartPoint <- list()
+> for(i in 1:Loop){
++   StartPoint <- c(StartPoint, list(list(database = z, StartModelIndex = rbinom(p,1,0.5), InverseT = InverseT , Seq = Seq_length, info = "AICc", family = "gaussian")))
++   i <- i+1
++ }
+> 
+> ###Searching
+> SelectedLModel.3 <- parLapply(cl,StartPoint,fastsearch)
+> 
+> ####Poisson regression-------------------------------------------
+> ###Setting up start point
+> i <- 1
+> StartPoint <- list()
+> for(i in 1:Loop){
++   StartPoint <- c(StartPoint, list(list(database = z, StartModelIndex = rbinom(p,1,0.5), InverseT = InverseT , Seq = Seq_length, info = "AICc", family = "poisson")))
++   i <- i+1
++ }
+> 
+> ###Searching
+> SelectedPModel.3 <- parLapply(cl,StartPoint,fastsearch)
+> 
+> ###END
+> stopCluster(cl)
+> 
+> LModelCompare <- t(sapply(SelectedLModel, ModelSelected))
+> summary(LModelCompare)
+       V1          V2                V3                V4        
+ Min.   :1   Min.   :0.05900   Min.   :0.02200   Min.   :0.0920  
+ 1st Qu.:1   1st Qu.:0.06875   1st Qu.:0.03875   1st Qu.:0.1080  
+ Median :1   Median :0.07700   Median :0.04150   Median :0.1290  
+ Mean   :1   Mean   :0.07997   Mean   :0.04145   Mean   :0.1322  
+ 3rd Qu.:1   3rd Qu.:0.08600   3rd Qu.:0.04400   3rd Qu.:0.1560  
+ Max.   :1   Max.   :0.11900   Max.   :0.08300   Max.   :0.1720  
+       V5               V6               V7               V8        
+ Min.   :0.0620   Min.   :0.5300   Min.   :0.3410   Min.   :0.1510  
+ 1st Qu.:0.0860   1st Qu.:0.5970   1st Qu.:0.4760   1st Qu.:0.1805  
+ Median :0.1080   Median :0.6810   Median :0.4810   Median :0.2010  
+ Mean   :0.1016   Mean   :0.6647   Mean   :0.5182   Mean   :0.2007  
+ 3rd Qu.:0.1100   3rd Qu.:0.7165   3rd Qu.:0.5533   3rd Qu.:0.2220  
+ Max.   :0.1530   Max.   :0.7670   Max.   :0.7710   Max.   :0.2380  
+       V9              V10              V11              V12        
+ Min.   :0.2380   Min.   :0.1470   Min.   :0.2630   Min.   :0.0670  
+ 1st Qu.:0.2650   1st Qu.:0.1658   1st Qu.:0.3185   1st Qu.:0.0880  
+ Median :0.2845   Median :0.1810   Median :0.3610   Median :0.1060  
+ Mean   :0.2948   Mean   :0.1913   Mean   :0.3547   Mean   :0.1008  
+ 3rd Qu.:0.3410   3rd Qu.:0.2230   3rd Qu.:0.3950   3rd Qu.:0.1110  
+ Max.   :0.3670   Max.   :0.2440   Max.   :0.4400   Max.   :0.1340  
+      V13               V14             V15               V16        
+ Min.   :0.05800   Min.   :0.159   Min.   :0.02200   Min.   :0.1540  
+ 1st Qu.:0.06600   1st Qu.:0.183   1st Qu.:0.03700   1st Qu.:0.1630  
+ Median :0.06950   Median :0.196   Median :0.04100   Median :0.1680  
+ Mean   :0.07108   Mean   :0.212   Mean   :0.04579   Mean   :0.1705  
+ 3rd Qu.:0.07600   3rd Qu.:0.231   3rd Qu.:0.04900   3rd Qu.:0.1772  
+ Max.   :0.08800   Max.   :0.342   Max.   :0.09300   Max.   :0.1900  
+      V17              V18               V19              V20         
+ Min.   :0.1280   Min.   :0.02400   Min.   :0.3280   Min.   :0.05000  
+ 1st Qu.:0.1490   1st Qu.:0.03600   1st Qu.:0.5460   1st Qu.:0.05600  
+ Median :0.1590   Median :0.04000   Median :0.5660   Median :0.06400  
+ Mean   :0.1588   Mean   :0.04037   Mean   :0.5662   Mean   :0.07427  
+ 3rd Qu.:0.1640   3rd Qu.:0.04400   3rd Qu.:0.6195   3rd Qu.:0.07700  
+ Max.   :0.1960   Max.   :0.05200   Max.   :0.7150   Max.   :0.19400  
+      V21              V22              V23              V24         
+ Min.   :0.1220   Min.   :0.8070   Min.   :0.9580   Min.   :0.03600  
+ 1st Qu.:0.1390   1st Qu.:0.8260   1st Qu.:0.9768   1st Qu.:0.04800  
+ Median :0.1550   Median :0.8480   Median :0.9840   Median :0.05500  
+ Mean   :0.1723   Mean   :0.8484   Mean   :0.9838   Mean   :0.07963  
+ 3rd Qu.:0.1860   3rd Qu.:0.8640   3rd Qu.:0.9950   3rd Qu.:0.09100  
+ Max.   :0.3260   Max.   :0.8920   Max.   :0.9960   Max.   :0.25600  
+      V25              V26               V27              V28        
+ Min.   :0.7840   Min.   :0.02500   Min.   :0.1490   Min.   :0.2180  
+ 1st Qu.:0.9285   1st Qu.:0.02800   1st Qu.:0.1710   1st Qu.:0.2750  
+ Median :0.9620   Median :0.03200   Median :0.1845   Median :0.2810  
+ Mean   :0.9408   Mean   :0.03524   Mean   :0.1837   Mean   :0.2956  
+ 3rd Qu.:0.9740   3rd Qu.:0.04300   3rd Qu.:0.1973   3rd Qu.:0.3260  
+ Max.   :0.9790   Max.   :0.05100   Max.   :0.2120   Max.   :0.3530  
+      V29              V30              V31              V32        
+ Min.   :0.0760   Min.   :0.2190   Min.   :0.8450   Min.   :0.0970  
+ 1st Qu.:0.0900   1st Qu.:0.2405   1st Qu.:0.9160   1st Qu.:0.1150  
+ Median :0.0990   Median :0.2945   Median :0.9235   Median :0.1240  
+ Mean   :0.1095   Mean   :0.2883   Mean   :0.9265   Mean   :0.1377  
+ 3rd Qu.:0.1250   3rd Qu.:0.3290   3rd Qu.:0.9440   3rd Qu.:0.1360  
+ Max.   :0.1970   Max.   :0.3690   Max.   :0.9640   Max.   :0.3100  
+      V33              V34              V35               V36        
+ Min.   :0.2570   Min.   :0.0280   Min.   :0.03300   Min.   :0.0660  
+ 1st Qu.:0.3360   1st Qu.:0.0340   1st Qu.:0.03575   1st Qu.:0.0845  
+ Median :0.3425   Median :0.0390   Median :0.03900   Median :0.1025  
+ Mean   :0.3487   Mean   :0.0424   Mean   :0.04078   Mean   :0.1142  
+ 3rd Qu.:0.3830   3rd Qu.:0.0490   3rd Qu.:0.04500   3rd Qu.:0.1310  
+ Max.   :0.4150   Max.   :0.0750   Max.   :0.05900   Max.   :0.2700  
+      V37         
+ Min.   :0.02700  
+ 1st Qu.:0.04000  
+ Median :0.04500  
+ Mean   :0.06366  
+ 3rd Qu.:0.06800  
+ Max.   :0.21200  
+> PModelCompare <- t(sapply(SelectedPModel, ModelSelected))
+> summary(PModelCompare)
+       V1          V2                V3                V4        
+ Min.   :1   Min.   :0.05400   Min.   :0.06200   Min.   :0.0840  
+ 1st Qu.:1   1st Qu.:0.06300   1st Qu.:0.07500   1st Qu.:0.1020  
+ Median :1   Median :0.07000   Median :0.08150   Median :0.1100  
+ Mean   :1   Mean   :0.06932   Mean   :0.08092   Mean   :0.1109  
+ 3rd Qu.:1   3rd Qu.:0.07500   3rd Qu.:0.08700   3rd Qu.:0.1182  
+ Max.   :1   Max.   :0.08400   Max.   :0.10100   Max.   :0.1420  
+       V5               V6               V7               V8         
+ Min.   :0.0850   Min.   :0.3120   Min.   :0.2720   Min.   :0.06500  
+ 1st Qu.:0.1080   1st Qu.:0.3920   1st Qu.:0.3058   1st Qu.:0.07200  
+ Median :0.1150   Median :0.4070   Median :0.3215   Median :0.07700  
+ Mean   :0.1149   Mean   :0.4054   Mean   :0.3260   Mean   :0.07712  
+ 3rd Qu.:0.1212   3rd Qu.:0.4233   3rd Qu.:0.3473   3rd Qu.:0.08100  
+ Max.   :0.1410   Max.   :0.4520   Max.   :0.3920   Max.   :0.09800  
+       V9              V10               V11              V12         
+ Min.   :0.3640   Min.   :0.06800   Min.   :0.0840   Min.   :0.07300  
+ 1st Qu.:0.3987   1st Qu.:0.08300   1st Qu.:0.1057   1st Qu.:0.08500  
+ Median :0.4105   Median :0.08900   Median :0.1140   Median :0.08900  
+ Mean   :0.4121   Mean   :0.08957   Mean   :0.1151   Mean   :0.08987  
+ 3rd Qu.:0.4270   3rd Qu.:0.09500   3rd Qu.:0.1230   3rd Qu.:0.09500  
+ Max.   :0.4640   Max.   :0.11500   Max.   :0.1520   Max.   :0.10500  
+      V13              V14              V15               V16         
+ Min.   :0.1160   Min.   :0.0750   Min.   :0.04800   Min.   :0.06900  
+ 1st Qu.:0.1318   1st Qu.:0.0900   1st Qu.:0.06800   1st Qu.:0.09100  
+ Median :0.1380   Median :0.0965   Median :0.07300   Median :0.09800  
+ Mean   :0.1382   Mean   :0.0967   Mean   :0.07371   Mean   :0.09688  
+ 3rd Qu.:0.1450   3rd Qu.:0.1022   3rd Qu.:0.07700   3rd Qu.:0.10300  
+ Max.   :0.1660   Max.   :0.1240   Max.   :0.10400   Max.   :0.11700  
+      V17               V18              V19              V20         
+ Min.   :0.07600   Min.   :0.0820   Min.   :0.2790   Min.   :0.05900  
+ 1st Qu.:0.08875   1st Qu.:0.1070   1st Qu.:0.3157   1st Qu.:0.07300  
+ Median :0.09300   Median :0.1140   Median :0.3330   Median :0.08000  
+ Mean   :0.09280   Mean   :0.1134   Mean   :0.3325   Mean   :0.08003  
+ 3rd Qu.:0.09725   3rd Qu.:0.1220   3rd Qu.:0.3490   3rd Qu.:0.08900  
+ Max.   :0.11900   Max.   :0.1460   Max.   :0.3960   Max.   :0.09900  
+      V21               V22              V23              V24       
+ Min.   :0.07500   Min.   :0.1030   Min.   :0.2170   Min.   :0.095  
+ 1st Qu.:0.09175   1st Qu.:0.1200   1st Qu.:0.2490   1st Qu.:0.118  
+ Median :0.10000   Median :0.1285   Median :0.2600   Median :0.125  
+ Mean   :0.09903   Mean   :0.1270   Mean   :0.2625   Mean   :0.127  
+ 3rd Qu.:0.10600   3rd Qu.:0.1350   3rd Qu.:0.2770   3rd Qu.:0.135  
+ Max.   :0.12500   Max.   :0.1550   Max.   :0.3030   Max.   :0.160  
+      V25              V26               V27               V28        
+ Min.   :0.1110   Min.   :0.06300   Min.   :0.04700   Min.   :0.2190  
+ 1st Qu.:0.1318   1st Qu.:0.07500   1st Qu.:0.06000   1st Qu.:0.2720  
+ Median :0.1400   Median :0.08050   Median :0.06400   Median :0.2810  
+ Mean   :0.1389   Mean   :0.08120   Mean   :0.06549   Mean   :0.2821  
+ 3rd Qu.:0.1470   3rd Qu.:0.08625   3rd Qu.:0.07125   3rd Qu.:0.2910  
+ Max.   :0.1620   Max.   :0.10500   Max.   :0.08500   Max.   :0.3470  
+      V29              V30              V31              V32         
+ Min.   :0.0970   Min.   :0.2910   Min.   :0.3800   Min.   :0.05000  
+ 1st Qu.:0.1280   1st Qu.:0.3478   1st Qu.:0.4360   1st Qu.:0.06200  
+ Median :0.1350   Median :0.3630   Median :0.4575   Median :0.06700  
+ Mean   :0.1357   Mean   :0.3628   Mean   :0.4564   Mean   :0.06765  
+ 3rd Qu.:0.1420   3rd Qu.:0.3740   3rd Qu.:0.4810   3rd Qu.:0.07400  
+ Max.   :0.1630   Max.   :0.4230   Max.   :0.5150   Max.   :0.08300  
+      V33              V34              V35              V36         
+ Min.   :0.0950   Min.   :0.1420   Min.   :0.1370   Min.   :0.07800  
+ 1st Qu.:0.1120   1st Qu.:0.1650   1st Qu.:0.1690   1st Qu.:0.09200  
+ Median :0.1170   Median :0.1730   Median :0.1810   Median :0.09700  
+ Mean   :0.1176   Mean   :0.1739   Mean   :0.1789   Mean   :0.09866  
+ 3rd Qu.:0.1220   3rd Qu.:0.1830   3rd Qu.:0.1890   3rd Qu.:0.10400  
+ Max.   :0.1470   Max.   :0.2150   Max.   :0.2160   Max.   :0.12700  
+      V37        
+ Min.   :0.0960  
+ 1st Qu.:0.1190  
+ Median :0.1265  
+ Mean   :0.1256  
+ 3rd Qu.:0.1320  
+ Max.   :0.1550  
+> LModelCompare.3 <- t(sapply(SelectedLModel.3, ModelSelected))
+> summary(LModelCompare.3)
+       V1          V2                V3              V4         
+ Min.   :1   Min.   :0.00000   Min.   :0e+00   Min.   :0.00000  
+ 1st Qu.:1   1st Qu.:0.00000   1st Qu.:0e+00   1st Qu.:0.00100  
+ Median :1   Median :0.00100   Median :0e+00   Median :0.00200  
+ Mean   :1   Mean   :0.00181   Mean   :4e-05   Mean   :0.01187  
+ 3rd Qu.:1   3rd Qu.:0.00300   3rd Qu.:0e+00   3rd Qu.:0.00500  
+ Max.   :1   Max.   :0.01300   Max.   :1e-03   Max.   :1.00000  
+       V5                 V6               V7               V8         
+ Min.   :0.000000   Min.   :0.0000   Min.   :0.0000   Min.   :0.00000  
+ 1st Qu.:0.000000   1st Qu.:0.9712   1st Qu.:0.0000   1st Qu.:0.00300  
+ Median :0.001000   Median :1.0000   Median :1.0000   Median :0.02150  
+ Mean   :0.008135   Mean   :0.9173   Mean   :0.5638   Mean   :0.04603  
+ 3rd Qu.:0.002000   3rd Qu.:1.0000   3rd Qu.:1.0000   3rd Qu.:0.05625  
+ Max.   :1.000000   Max.   :1.0000   Max.   :1.0000   Max.   :0.98400  
+       V9              V10               V11              V12         
+ Min.   :0.0000   Min.   :0.00000   Min.   :0.0000   Min.   :0.00000  
+ 1st Qu.:0.1658   1st Qu.:0.00000   1st Qu.:0.4265   1st Qu.:0.00200  
+ Median :0.3425   Median :0.00000   Median :0.5930   Median :0.00500  
+ Mean   :0.3366   Mean   :0.01555   Mean   :0.5713   Mean   :0.05825  
+ 3rd Qu.:0.5160   3rd Qu.:0.00100   3rd Qu.:0.7550   3rd Qu.:0.12925  
+ Max.   :0.8360   Max.   :1.00000   Max.   :0.9970   Max.   :0.27500  
+      V13               V14               V15               V16         
+ Min.   :0.00000   Min.   :0.00100   Min.   :0.0e+00   Min.   :0.00000  
+ 1st Qu.:0.01000   1st Qu.:0.01575   1st Qu.:0.0e+00   1st Qu.:0.04975  
+ Median :0.01950   Median :0.03600   Median :0.0e+00   Median :0.08250  
+ Mean   :0.01898   Mean   :0.08882   Mean   :5.5e-05   Mean   :0.09270  
+ 3rd Qu.:0.02700   3rd Qu.:0.05725   3rd Qu.:0.0e+00   3rd Qu.:0.12250  
+ Max.   :0.04600   Max.   :1.00000   Max.   :1.0e-03   Max.   :0.27000  
+      V17             V18             V19              V20         
+ Min.   :0.000   Min.   :0e+00   Min.   :0.0000   Min.   :0.00000  
+ 1st Qu.:0.009   1st Qu.:0e+00   1st Qu.:0.0000   1st Qu.:0.00000  
+ Median :0.016   Median :0e+00   Median :0.1365   Median :0.00000  
+ Mean   :0.025   Mean   :1e-05   Mean   :0.4646   Mean   :0.05031  
+ 3rd Qu.:0.027   3rd Qu.:0e+00   3rd Qu.:1.0000   3rd Qu.:0.00025  
+ Max.   :0.971   Max.   :2e-03   Max.   :1.0000   Max.   :1.00000  
+      V21               V22              V23         V24         
+ Min.   :0.00000   Min.   :0.0000   Min.   :1   Min.   :0.00000  
+ 1st Qu.:0.00600   1st Qu.:1.0000   1st Qu.:1   1st Qu.:0.00000  
+ Median :0.01350   Median :1.0000   Median :1   Median :0.00000  
+ Mean   :0.07533   Mean   :0.9849   Mean   :1   Mean   :0.05006  
+ 3rd Qu.:0.03500   3rd Qu.:1.0000   3rd Qu.:1   3rd Qu.:0.00000  
+ Max.   :1.00000   Max.   :1.0000   Max.   :1   Max.   :1.00000  
+      V25            V26                V27              V28        
+ Min.   :0.00   Min.   :0.000000   Min.   :0.0000   Min.   :0.0000  
+ 1st Qu.:1.00   1st Qu.:0.000000   1st Qu.:0.1455   1st Qu.:0.4032  
+ Median :1.00   Median :0.000000   Median :0.2315   Median :0.4805  
+ Mean   :0.95   Mean   :0.000565   Mean   :0.2663   Mean   :0.5106  
+ 3rd Qu.:1.00   3rd Qu.:0.001000   3rd Qu.:0.3725   3rd Qu.:0.6082  
+ Max.   :1.00   Max.   :0.008000   Max.   :0.7810   Max.   :1.0000  
+      V29               V30               V31              V32         
+ Min.   :0.00000   Min.   :0.00000   Min.   :0.1720   Min.   :0.00000  
+ 1st Qu.:0.00100   1st Qu.:0.00000   1st Qu.:1.0000   1st Qu.:0.00400  
+ Median :0.00200   Median :0.00000   Median :1.0000   Median :0.01050  
+ Mean   :0.03012   Mean   :0.05662   Mean   :0.9708   Mean   :0.06637  
+ 3rd Qu.:0.00400   3rd Qu.:0.01575   3rd Qu.:1.0000   3rd Qu.:0.02800  
+ Max.   :1.00000   Max.   :1.00000   Max.   :1.0000   Max.   :1.00000  
+      V33              V34               V35                V36         
+ Min.   :0.0000   Min.   :0.00000   Min.   :0.000000   Min.   :0.00000  
+ 1st Qu.:0.1517   1st Qu.:0.00000   1st Qu.:0.000000   1st Qu.:0.00000  
+ Median :0.2405   Median :0.00000   Median :0.000000   Median :0.00000  
+ Mean   :0.3073   Mean   :0.01027   Mean   :0.000185   Mean   :0.05344  
+ 3rd Qu.:0.4925   3rd Qu.:0.00000   3rd Qu.:0.000000   3rd Qu.:0.00200  
+ Max.   :0.7320   Max.   :0.79500   Max.   :0.004000   Max.   :1.00000  
+      V37         
+ Min.   :0.00000  
+ 1st Qu.:0.00000  
+ Median :0.00000  
+ Mean   :0.05001  
+ 3rd Qu.:0.00000  
+ Max.   :1.00000  
+> PModelCompare.3 <- t(sapply(SelectedPModel.3, ModelSelected))
+> summary(PModelCompare.3)
+       V1          V2                 V3                V4          
+ Min.   :1   Min.   :0.000000   Min.   :0.00000   Min.   :0.000000  
+ 1st Qu.:1   1st Qu.:0.000000   1st Qu.:0.00000   1st Qu.:0.000000  
+ Median :1   Median :0.001000   Median :0.00100   Median :0.001000  
+ Mean   :1   Mean   :0.000835   Mean   :0.01162   Mean   :0.005715  
+ 3rd Qu.:1   3rd Qu.:0.001000   3rd Qu.:0.00200   3rd Qu.:0.002000  
+ Max.   :1   Max.   :0.004000   Max.   :0.10600   Max.   :0.066000  
+       V5                 V6               V7                V8          
+ Min.   :0.000000   Min.   :0.0110   Min.   :0.00000   Min.   :0.000000  
+ 1st Qu.:0.001000   1st Qu.:0.8810   1st Qu.:0.00400   1st Qu.:0.000000  
+ Median :0.002000   Median :0.9900   Median :0.00700   Median :0.000000  
+ Mean   :0.006555   Mean   :0.9023   Mean   :0.05592   Mean   :0.000975  
+ 3rd Qu.:0.003000   3rd Qu.:1.0000   3rd Qu.:0.04575   3rd Qu.:0.002000  
+ Max.   :0.069000   Max.   :1.0000   Max.   :0.61100   Max.   :0.007000  
+       V9              V10                V11                V12          
+ Min.   :0.1360   Min.   :0.000000   Min.   :0.000000   Min.   :0.000000  
+ 1st Qu.:0.9510   1st Qu.:0.000000   1st Qu.:0.000000   1st Qu.:0.000000  
+ Median :0.9990   Median :0.001000   Median :0.000000   Median :0.001000  
+ Mean   :0.9278   Mean   :0.001665   Mean   :0.001175   Mean   :0.001865  
+ 3rd Qu.:1.0000   3rd Qu.:0.002000   3rd Qu.:0.001000   3rd Qu.:0.002000  
+ Max.   :1.0000   Max.   :0.015000   Max.   :0.041000   Max.   :0.018000  
+      V13                V14               V15               V16          
+ Min.   :0.000000   Min.   :0.00000   Min.   :0.00000   Min.   :0.000000  
+ 1st Qu.:0.001000   1st Qu.:0.00000   1st Qu.:0.00000   1st Qu.:0.001000  
+ Median :0.002000   Median :0.00100   Median :0.00100   Median :0.002000  
+ Mean   :0.004545   Mean   :0.00168   Mean   :0.00241   Mean   :0.002305  
+ 3rd Qu.:0.005250   3rd Qu.:0.00200   3rd Qu.:0.00200   3rd Qu.:0.003000  
+ Max.   :0.022000   Max.   :0.01200   Max.   :0.01500   Max.   :0.008000  
+      V17               V18               V19               V20         
+ Min.   :0.00000   Min.   :0.00000   Min.   :0.00000   Min.   :0.00000  
+ 1st Qu.:0.00300   1st Qu.:0.00000   1st Qu.:0.00300   1st Qu.:0.00000  
+ Median :0.00500   Median :0.00000   Median :0.00500   Median :0.00100  
+ Mean   :0.00544   Mean   :0.00108   Mean   :0.04264   Mean   :0.00132  
+ 3rd Qu.:0.00700   3rd Qu.:0.00200   3rd Qu.:0.00700   3rd Qu.:0.00200  
+ Max.   :0.01400   Max.   :0.01700   Max.   :0.44100   Max.   :0.00500  
+      V21                V22               V23              V24          
+ Min.   :0.000000   Min.   :0.00000   Min.   :0.0000   Min.   :0.000000  
+ 1st Qu.:0.000000   1st Qu.:0.00000   1st Qu.:0.2477   1st Qu.:0.000000  
+ Median :0.001000   Median :0.00000   Median :0.4080   Median :0.001000  
+ Mean   :0.001165   Mean   :0.00451   Mean   :0.4348   Mean   :0.007885  
+ 3rd Qu.:0.001000   3rd Qu.:0.00300   3rd Qu.:0.6048   3rd Qu.:0.002000  
+ Max.   :0.006000   Max.   :0.05100   Max.   :0.9140   Max.   :0.101000  
+      V25               V26                V27                V28         
+ Min.   :0.00000   Min.   :0.001000   Min.   :0.000000   Min.   :0.00800  
+ 1st Qu.:0.00100   1st Qu.:0.004000   1st Qu.:0.000000   1st Qu.:0.02100  
+ Median :0.00200   Median :0.007000   Median :0.000000   Median :0.03400  
+ Mean   :0.00628   Mean   :0.007385   Mean   :0.000575   Mean   :0.03864  
+ 3rd Qu.:0.00525   3rd Qu.:0.009000   3rd Qu.:0.001000   3rd Qu.:0.04300  
+ Max.   :0.05800   Max.   :0.016000   Max.   :0.004000   Max.   :0.20300  
+      V29               V30               V31               V32         
+ Min.   :0.00300   Min.   :0.00000   Min.   :0.00100   Min.   :0.00000  
+ 1st Qu.:0.01100   1st Qu.:0.00000   1st Qu.:0.00700   1st Qu.:0.00000  
+ Median :0.01400   Median :0.01200   Median :0.00900   Median :0.00100  
+ Mean   :0.01495   Mean   :0.08407   Mean   :0.06646   Mean   :0.00082  
+ 3rd Qu.:0.01900   3rd Qu.:0.09000   3rd Qu.:0.05425   3rd Qu.:0.00100  
+ Max.   :0.03100   Max.   :0.83100   Max.   :0.90500   Max.   :0.00600  
+      V33             V34              V35              V36          
+ Min.   :0.000   Min.   :0.0000   Min.   :0.0000   Min.   :0.000000  
+ 1st Qu.:0.000   1st Qu.:0.0315   1st Qu.:0.1160   1st Qu.:0.000000  
+ Median :0.001   Median :0.0570   Median :0.3420   Median :0.001000  
+ Mean   :0.005   Mean   :0.1280   Mean   :0.3755   Mean   :0.004705  
+ 3rd Qu.:0.002   3rd Qu.:0.1388   3rd Qu.:0.5883   3rd Qu.:0.003250  
+ Max.   :0.044   Max.   :0.6460   Max.   :1.0000   Max.   :0.033000  
+      V37         
+ Min.   :0.00000  
+ 1st Qu.:0.00100  
+ Median :0.00200  
+ Mean   :0.02649  
+ 3rd Qu.:0.02925  
+ Max.   :0.35200  
+> LModelCompare_SA <- t(sapply(SelectedLModel_SA, ModelSelected))
+> summary(LModelCompare_SA)
+       V1          V2                 V3              V4        
+ Min.   :1   Min.   :0.000000   Min.   :0.000   Min.   :0.0000  
+ 1st Qu.:1   1st Qu.:0.000000   1st Qu.:0.000   1st Qu.:0.0000  
+ Median :1   Median :0.000000   Median :0.000   Median :0.0000  
+ Mean   :1   Mean   :0.005025   Mean   :0.005   Mean   :0.0496  
+ 3rd Qu.:1   3rd Qu.:0.000000   3rd Qu.:0.000   3rd Qu.:0.0000  
+ Max.   :1   Max.   :1.000000   Max.   :1.000   Max.   :1.0000  
+       V5              V6               V7              V8         
+ Min.   :0.000   Min.   :0.0000   Min.   :0.000   Min.   :0.00000  
+ 1st Qu.:0.000   1st Qu.:0.0000   1st Qu.:0.000   1st Qu.:0.00000  
+ Median :0.000   Median :0.0000   Median :0.000   Median :0.00000  
+ Mean   :0.015   Mean   :0.4674   Mean   :0.435   Mean   :0.09107  
+ 3rd Qu.:0.000   3rd Qu.:1.0000   3rd Qu.:1.000   3rd Qu.:0.00000  
+ Max.   :1.000   Max.   :1.0000   Max.   :1.000   Max.   :1.00000  
+       V9              V10            V11              V12         
+ Min.   :0.0000   Min.   :0.00   Min.   :0.0000   Min.   :0.00000  
+ 1st Qu.:0.0000   1st Qu.:0.00   1st Qu.:0.0000   1st Qu.:0.00000  
+ Median :0.0000   Median :0.00   Median :0.0000   Median :0.00000  
+ Mean   :0.2905   Mean   :0.04   Mean   :0.2048   Mean   :0.01025  
+ 3rd Qu.:1.0000   3rd Qu.:0.00   3rd Qu.:0.0030   3rd Qu.:0.00000  
+ Max.   :1.0000   Max.   :1.00   Max.   :1.0000   Max.   :1.00000  
+      V13                V14               V15             V16         
+ Min.   :0.000000   Min.   :0.00000   Min.   :0.000   Min.   :0.00000  
+ 1st Qu.:0.000000   1st Qu.:0.00000   1st Qu.:0.000   1st Qu.:0.00000  
+ Median :0.000000   Median :0.00000   Median :0.000   Median :0.00000  
+ Mean   :0.000485   Mean   :0.06305   Mean   :0.005   Mean   :0.03637  
+ 3rd Qu.:0.000000   3rd Qu.:0.00100   3rd Qu.:0.000   3rd Qu.:0.00000  
+ Max.   :0.082000   Max.   :1.00000   Max.   :1.000   Max.   :1.00000  
+      V17                V18             V19            V20       
+ Min.   :0.000000   Min.   :0e+00   Min.   :0.00   Min.   :0.000  
+ 1st Qu.:0.000000   1st Qu.:0e+00   1st Qu.:0.00   1st Qu.:0.000  
+ Median :0.000000   Median :0e+00   Median :1.00   Median :0.000  
+ Mean   :0.005495   Mean   :1e-05   Mean   :0.55   Mean   :0.015  
+ 3rd Qu.:0.000000   3rd Qu.:0e+00   3rd Qu.:1.00   3rd Qu.:0.000  
+ Max.   :0.324000   Max.   :2e-03   Max.   :1.00   Max.   :1.000  
+      V21               V22            V23            V24       
+ Min.   :0.00000   Min.   :0.00   Min.   :0.00   Min.   :0.000  
+ 1st Qu.:0.00000   1st Qu.:1.00   1st Qu.:1.00   1st Qu.:0.000  
+ Median :0.00000   Median :1.00   Median :1.00   Median :0.000  
+ Mean   :0.08349   Mean   :0.81   Mean   :0.85   Mean   :0.065  
+ 3rd Qu.:0.00000   3rd Qu.:1.00   3rd Qu.:1.00   3rd Qu.:0.000  
+ Max.   :1.00000   Max.   :1.00   Max.   :1.00   Max.   :1.000  
+      V25              V26             V27               V28       
+ Min.   :0.0000   Min.   :0.000   Min.   :0.00000   Min.   :0.000  
+ 1st Qu.:1.0000   1st Qu.:0.000   1st Qu.:0.00000   1st Qu.:0.000  
+ Median :1.0000   Median :0.000   Median :0.00000   Median :0.070  
+ Mean   :0.7861   Mean   :0.015   Mean   :0.07692   Mean   :0.497  
+ 3rd Qu.:1.0000   3rd Qu.:0.000   3rd Qu.:0.00000   3rd Qu.:1.000  
+ Max.   :1.0000   Max.   :1.000   Max.   :1.00000   Max.   :1.000  
+      V29               V30              V31             V32         
+ Min.   :0.00000   Min.   :0.0000   Min.   :0.000   Min.   :0.00000  
+ 1st Qu.:0.00000   1st Qu.:0.0000   1st Qu.:1.000   1st Qu.:0.00000  
+ Median :0.00000   Median :0.0000   Median :1.000   Median :0.00000  
+ Mean   :0.11253   Mean   :0.3776   Mean   :0.845   Mean   :0.04004  
+ 3rd Qu.:0.01525   3rd Qu.:1.0000   3rd Qu.:1.000   3rd Qu.:0.00000  
+ Max.   :1.00000   Max.   :1.0000   Max.   :1.000   Max.   :1.00000  
+      V33              V34               V35             V36        
+ Min.   :0.0000   Min.   :0.00000   Min.   :0.000   Min.   :0.0000  
+ 1st Qu.:0.0000   1st Qu.:0.00000   1st Qu.:0.000   1st Qu.:0.0000  
+ Median :0.0000   Median :0.00000   Median :0.000   Median :0.0000  
+ Mean   :0.4502   Mean   :0.04504   Mean   :0.035   Mean   :0.1595  
+ 3rd Qu.:1.0000   3rd Qu.:0.00000   3rd Qu.:0.000   3rd Qu.:0.0000  
+ Max.   :1.0000   Max.   :1.00000   Max.   :1.000   Max.   :1.0000  
+      V37        
+ Min.   :0.0000  
+ 1st Qu.:0.0000  
+ Median :0.0000  
+ Mean   :0.0836  
+ 3rd Qu.:0.0000  
+ Max.   :1.0000  
+> PModelCompare_SA <- t(sapply(SelectedPModel_SA, ModelSelected))
+> summary(PModelCompare_SA)
+       V1          V2          V3                V4                V5       
+ Min.   :1   Min.   :0   Min.   :0.00000   Min.   :0.00000   Min.   :0.000  
+ 1st Qu.:1   1st Qu.:0   1st Qu.:0.00000   1st Qu.:0.00000   1st Qu.:0.000  
+ Median :1   Median :0   Median :0.00000   Median :0.00000   Median :0.000  
+ Mean   :1   Mean   :0   Mean   :0.03404   Mean   :0.00501   Mean   :0.005  
+ 3rd Qu.:1   3rd Qu.:0   3rd Qu.:0.00000   3rd Qu.:0.00000   3rd Qu.:0.000  
+ Max.   :1   Max.   :0   Max.   :1.00000   Max.   :1.00000   Max.   :1.000  
+       V6               V7               V8              V9        
+ Min.   :0.0000   Min.   :0.0000   Min.   :0e+00   Min.   :0.0000  
+ 1st Qu.:0.0000   1st Qu.:0.0000   1st Qu.:0e+00   1st Qu.:0.0000  
+ Median :1.0000   Median :0.0000   Median :0e+00   Median :1.0000  
+ Mean   :0.5152   Mean   :0.2963   Mean   :1e-05   Mean   :0.5339  
+ 3rd Qu.:1.0000   3rd Qu.:1.0000   3rd Qu.:0e+00   3rd Qu.:1.0000  
+ Max.   :1.0000   Max.   :1.0000   Max.   :2e-03   Max.   :1.0000  
+      V10             V11         V12               V13         
+ Min.   :0e+00   Min.   :0   Min.   :0.00000   Min.   :0.00000  
+ 1st Qu.:0e+00   1st Qu.:0   1st Qu.:0.00000   1st Qu.:0.00000  
+ Median :0e+00   Median :0   Median :0.00000   Median :0.00000  
+ Mean   :3e-05   Mean   :0   Mean   :0.00036   Mean   :0.00021  
+ 3rd Qu.:0e+00   3rd Qu.:0   3rd Qu.:0.00000   3rd Qu.:0.00000  
+ Max.   :6e-03   Max.   :0   Max.   :0.01100   Max.   :0.03200  
+      V14                V15               V16         V17               V18   
+ Min.   :0.000000   Min.   :0.00000   Min.   :0   Min.   :0.0e+00   Min.   :0  
+ 1st Qu.:0.000000   1st Qu.:0.00000   1st Qu.:0   1st Qu.:0.0e+00   1st Qu.:0  
+ Median :0.000000   Median :0.00000   Median :0   Median :0.0e+00   Median :0  
+ Mean   :0.000175   Mean   :0.00014   Mean   :0   Mean   :1.5e-05   Mean   :0  
+ 3rd Qu.:0.000000   3rd Qu.:0.00000   3rd Qu.:0   3rd Qu.:0.0e+00   3rd Qu.:0  
+ Max.   :0.026000   Max.   :0.02400   Max.   :0   Max.   :1.0e-03   Max.   :0  
+      V19            V20             V21         V22               V23      
+ Min.   :0.00   Min.   :0e+00   Min.   :0   Min.   :0.00000   Min.   :0.00  
+ 1st Qu.:0.00   1st Qu.:0e+00   1st Qu.:0   1st Qu.:0.00000   1st Qu.:0.00  
+ Median :0.00   Median :0e+00   Median :0   Median :0.00000   Median :0.00  
+ Mean   :0.21   Mean   :5e-06   Mean   :0   Mean   :0.00486   Mean   :0.31  
+ 3rd Qu.:0.00   3rd Qu.:0e+00   3rd Qu.:0   3rd Qu.:0.00000   3rd Qu.:1.00  
+ Max.   :1.00   Max.   :1e-03   Max.   :0   Max.   :0.72800   Max.   :1.00  
+      V24               V25               V26         V27         V28         
+ Min.   :0.00000   Min.   :0.00000   Min.   :0   Min.   :0   Min.   :0.00000  
+ 1st Qu.:0.00000   1st Qu.:0.00000   1st Qu.:0   1st Qu.:0   1st Qu.:0.00000  
+ Median :0.00000   Median :0.00000   Median :0   Median :0   Median :0.00000  
+ Mean   :0.05887   Mean   :0.01321   Mean   :0   Mean   :0   Mean   :0.06029  
+ 3rd Qu.:0.00000   3rd Qu.:0.00000   3rd Qu.:0   3rd Qu.:0   3rd Qu.:0.00000  
+ Max.   :0.97400   Max.   :1.00000   Max.   :0   Max.   :0   Max.   :1.00000  
+      V29                V30              V31              V32   
+ Min.   :0.000000   Min.   :0.0000   Min.   :0.0000   Min.   :0  
+ 1st Qu.:0.000000   1st Qu.:0.0000   1st Qu.:0.0000   1st Qu.:0  
+ Median :0.000000   Median :0.0000   Median :0.0000   Median :0  
+ Mean   :0.000105   Mean   :0.4199   Mean   :0.4264   Mean   :0  
+ 3rd Qu.:0.000000   3rd Qu.:1.0000   3rd Qu.:1.0000   3rd Qu.:0  
+ Max.   :0.011000   Max.   :1.0000   Max.   :1.0000   Max.   :0  
+      V33                V34              V35            V36          
+ Min.   :0.000000   Min.   :0.0000   Min.   :0.00   Min.   :0.000000  
+ 1st Qu.:0.000000   1st Qu.:0.0000   1st Qu.:0.00   1st Qu.:0.000000  
+ Median :0.000000   Median :0.0000   Median :0.00   Median :0.000000  
+ Mean   :0.001215   Mean   :0.1212   Mean   :0.15   Mean   :0.005395  
+ 3rd Qu.:0.000000   3rd Qu.:0.0000   3rd Qu.:0.00   3rd Qu.:0.000000  
+ Max.   :0.229000   Max.   :1.0000   Max.   :1.00   Max.   :0.980000  
+      V37        
+ Min.   :0.0000  
+ 1st Qu.:0.0000  
+ Median :0.0000  
+ Mean   :0.3008  
+ 3rd Qu.:1.0000  
+ Max.   :1.0000  
+> 
+> save.image("/mount/autofs/home_ad1/student.unimelb.edu.au/lizhongc/myGit/RData-results/tcar1.RData")
+> 
+> proc.time()
+       user      system     elapsed 
+1256570.453    1460.191   44372.419 
