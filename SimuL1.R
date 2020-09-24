@@ -62,7 +62,7 @@ for(i in 1:Loop){
 SelectedModel <- parLapply(cl,StartPoint,fastsearch)
 
 ###Burn Length
-Cut_Length <- 50
+Cut_Length <- 10000
 
 ###Functions
 ###Burn sequence function
