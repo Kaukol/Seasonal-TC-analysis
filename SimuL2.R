@@ -3,8 +3,8 @@ setwd("/mount/autofs/home_ad1/student.unimelb.edu.au/lizhongc/myGit/Seasonal-TC-
 
 set.seed(1)
 
-source("gibbssearch.R")
-source("SimuX.R")
+source("/mount/autofs/home_ad1/student.unimelb.edu.au/lizhongc/myGit/Seasonal-TC-analysis/gibbssearch.R")
+source("/mount/autofs/home_ad1/student.unimelb.edu.au/lizhongc/myGit/Seasonal-TC-analysis/SimuX.R")
 
 fastsearch <- function(StartPoint){
   
