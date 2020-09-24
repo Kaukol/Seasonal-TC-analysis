@@ -1,0 +1,16 @@
+  
+#!/bin/bash
+
+echo "start"
+
+R CMD BATCH SimuL1.R
+
+R CMD BATCH SimuL1.3.R
+
+R CMD BATCH SimuL2.R
+
+R CMD BATCH SimuL2.3.R
+
+R CMD BATCH SimuL3.R
+
+R CMD BATCH SimuL3.3.R
