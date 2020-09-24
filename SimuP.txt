@@ -1,0 +1,9 @@
+#!/bin/bash
+
+R CMD BATCH SimuP1.R
+
+R CMD BATCH SimuP1.3.R
+
+R CMD BATCH SimuP2.R
+
+R CMD BATCH SimuP2.3.R
